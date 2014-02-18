@@ -292,7 +292,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		protected String host;
 		protected int port;
 		protected long subscribeRetryWaitTimeMillis = 5000;
-		protected Jedis j;
+		protected Jedis jedis;
 		protected AtomicBoolean running = new AtomicBoolean(false);
 	
 		protected MasterListener() {
@@ -316,10 +316,10 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 	
 		    while (running.get()) {
 	
-			j = new Jedis(host, port);
+			jedis = new Jedis(host, port);
 	
 			try {
-			    j.subscribe(new JedisPubSubAdapter() {
+			    jedis.subscribe(new JedisPubSubAdapter() {
 					@Override
 					public void onMessage(String channel, String message) {
 					    log.fine("Sentinel " + host + ":" + port + " published: " + message + ".");
@@ -386,7 +386,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 				log.fine("Shutting down listener on " + host + ":" + port);
 				running.set(false);
 				// This isn't good, the Jedis object is not thread safe
-				j.disconnect();
+				jedis.disconnect();
 		    } catch (Exception e) {
 		    	log.severe("Caught exception while shutting down: " + e.getMessage());
 		    }

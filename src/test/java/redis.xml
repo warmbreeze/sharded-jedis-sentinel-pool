@@ -12,7 +12,7 @@
 	http://www.springframework.org/schema/context/spring-context-3.0.xsd"
 	default-lazy-init="true" default-autowire="byName">
 
-	<bean id="shardedJedisPool" class="redis.clients.jedis.ShardedJedisSentinelPool" destory-method="">
+	<bean id="shardedJedisPool" class="redis.clients.jedis.ShardedJedisSentinelPool">
 		<constructor-arg index="0" ref="jedisPoolConfig" />
 		<constructor-arg index="1">
 			<list>
