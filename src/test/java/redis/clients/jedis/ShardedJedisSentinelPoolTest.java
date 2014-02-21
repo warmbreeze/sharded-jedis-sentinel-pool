@@ -14,30 +14,36 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 public class ShardedJedisSentinelPoolTest extends TestCase {
 
 	public void testX() throws Exception {
-		final Set<String> sentinels = new HashSet<String>();
+		
 		GenericObjectPoolConfig config = new GenericObjectPoolConfig();
-
-		sentinels.add("192.168.108.145:26379");
-//    sentinels.add("127.0.0.1:26379");
-//    sentinels.add("127.0.0.1:26380");
-//    sentinels.add("127.0.0.1:26381");
-    
+		
 		List<String> masters = new ArrayList<String>();
-		masters.add("mymaster");
-		masters.add("mymaster2");
-
-		ShardedJedisSentinelPool pool = new ShardedJedisSentinelPool(masters, sentinels, config, 90000, null, 0);
-
-		ShardedJedis j = pool.getResource();
-		pool.returnResource(j);
-
+		masters.add("shard1");
+		masters.add("shard2");
+		
+		Set<String> sentinels = new HashSet<String>();
+		sentinels.add("192.168.109.212:26379");
+		sentinels.add("192.168.109.215:26379");
+    
+		ShardedJedisSentinelPool pool = new ShardedJedisSentinelPool(masters, sentinels, config, 60000);
+		
+		ShardedJedis jedis = null;
+		try {
+			jedis = pool.getResource();
+			// do somethind...
+			// ...
+		} finally {
+			if (jedis != null) pool.returnResource(jedis);
+			pool.destroy();
+		}
+		
+		ShardedJedis j = null;
 		for (int i = 0; i < 100; i++) {
 			try {
 				j = pool.getResource();
 				j.set("KEY: " + i, "" + i);
 				System.out.print(i);
 				System.out.print(" ");
-//	    System.out.print(".");
 				Thread.sleep(500);
 				pool.returnResource(j);
 			} catch (JedisConnectionException e) {
@@ -54,7 +60,6 @@ public class ShardedJedisSentinelPoolTest extends TestCase {
 				j = pool.getResource();
 				assertEquals(j.get("KEY: " + i), "" + i);
 				System.out.print(".");
-//    	    System.out.println("KEY[" + i + "]: " + j.get("KEY: " + i));
 				Thread.sleep(500);
 				pool.returnResource(j);
 			} catch (JedisConnectionException e) {

@@ -23,6 +23,8 @@ import redis.clients.util.Pool;
 
 public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 
+	protected final Logger log = Logger.getLogger(getClass().getName());
+	
 	protected GenericObjectPoolConfig poolConfig;
 
     protected int timeout = Protocol.DEFAULT_TIMEOUT;
@@ -32,29 +34,22 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
     protected int database = Protocol.DEFAULT_DATABASE;
 
     protected Set<MasterListener> masterListeners = new HashSet<MasterListener>();
-
-    protected Logger log = Logger.getLogger(getClass().getName());
-
-    public ShardedJedisSentinelPool(final GenericObjectPoolConfig poolConfig, List<String> masters, Set<String> sentinels) {
-		this(masters, sentinels, poolConfig, Protocol.DEFAULT_TIMEOUT, null,
-			Protocol.DEFAULT_DATABASE);
-    }
     
-    public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels,
-	    final GenericObjectPoolConfig poolConfig) {
-		this(masters, sentinels, poolConfig, Protocol.DEFAULT_TIMEOUT, null,
-			Protocol.DEFAULT_DATABASE);
-    }
+    private volatile List<HostAndPort> currentHostMasters;
 
     public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels) {
 		this(masters, sentinels, new GenericObjectPoolConfig(),
 			Protocol.DEFAULT_TIMEOUT, null, Protocol.DEFAULT_DATABASE);
     }
-
-    public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels,
-	    String password) {
+    
+    public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels, String password) {
 		this(masters, sentinels, new GenericObjectPoolConfig(),
 			Protocol.DEFAULT_TIMEOUT, password);
+    }
+    
+    public ShardedJedisSentinelPool(final GenericObjectPoolConfig poolConfig, List<String> masters, Set<String> sentinels) {
+		this(masters, sentinels, poolConfig, Protocol.DEFAULT_TIMEOUT, null,
+			Protocol.DEFAULT_DATABASE);
     }
 
     public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels,
@@ -82,12 +77,11 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		this.poolConfig = poolConfig;
 		this.timeout = timeout;
 		this.password = password;
+		this.database = database;
 
 		List<HostAndPort> masterList = initSentinels(sentinels, masters);
 		initPool(masterList);
     }
-
-    private volatile List<HostAndPort> currentHostMasters;
 
     public void destroy() {
 		for (MasterListener m : masterListeners) {
@@ -146,37 +140,42 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 	    log.info("Trying to find all master from available Sentinels...");
 	    
 	    for (String masterName : masters) {
-	    	
 	    	HostAndPort master = null;
-	    	for (String sentinel : sentinels) {
-				final HostAndPort hap = toHostAndPort(Arrays.asList(sentinel.split(":")));
-
-				log.fine("Connecting to Sentinel " + hap);
-		
-				try {
-				    Jedis jedis = new Jedis(hap.getHost(), hap.getPort());
-				    master = masterMap.get(masterName);
-				    if (master == null) {
-						master = toHostAndPort(jedis.sentinelGetMasterAddrByName(masterName));
-						log.fine("Found Redis master at " + master);
-						masterMap.put(masterName, master);
-						shardMasters.add(master);
-						jedis.disconnect();
-						break;
-				    }
-				} catch (JedisConnectionException e) {
-				    log.warning("Cannot connect to sentinel running @ " + hap + ". Trying next one.");
-				}
-	    	}
+	    	boolean fetched = false;
 	    	
-	    	if (null == master) {
-	    		try {
-					log.severe("All sentinels down, cannot determine where is "
-						+ masterName + " master is running... sleeping 1000ms.");
-					Thread.sleep(1000);
-			    } catch (InterruptedException e) {
-			    	e.printStackTrace();
-			    }
+	    	while (!fetched) {
+	    		for (String sentinel : sentinels) {
+					final HostAndPort hap = toHostAndPort(Arrays.asList(sentinel.split(":")));
+
+					log.fine("Connecting to Sentinel " + hap);
+			
+					try {
+					    Jedis jedis = new Jedis(hap.getHost(), hap.getPort());
+					    master = masterMap.get(masterName);
+					    if (master == null) {
+							master = toHostAndPort(jedis.sentinelGetMasterAddrByName(masterName));
+							log.fine("Found Redis master at " + master);
+							masterMap.put(masterName, master);
+							shardMasters.add(master);
+							fetched = true;
+							jedis.disconnect();
+							break;
+					    }
+					} catch (JedisConnectionException e) {
+					    log.warning("Cannot connect to sentinel running @ " + hap + ". Trying next one.");
+					}
+		    	}
+		    	
+		    	if (null == master) {
+		    		try {
+						log.severe("All sentinels down, cannot determine where is "
+							+ masterName + " master is running... sleeping 1000ms, Will try again.");
+						Thread.sleep(1000);
+				    } catch (InterruptedException e) {
+				    	e.printStackTrace();
+				    }
+		    		fetched = false;
+		    	}
 	    	}
 	    }
 	    
@@ -332,7 +331,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 						    if (index >= 0) {
 						    	HostAndPort newHostMaster = toHostAndPort(Arrays.asList(switchMasterMsg[3], switchMasterMsg[4]));
 						    	List<HostAndPort> newHostMasters = new ArrayList<HostAndPort>();
-						    	for (int i =0; i < masters.size(); i++) {
+						    	for (int i = 0; i < masters.size(); i++) {
 						    		newHostMasters.add(null);
 						    	}
 						    	Collections.copy(newHostMasters, currentHostMasters);

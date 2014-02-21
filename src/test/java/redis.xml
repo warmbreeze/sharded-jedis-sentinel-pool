@@ -16,13 +16,14 @@
 		<constructor-arg index="0" ref="jedisPoolConfig" />
 		<constructor-arg index="1">
 			<list>
-				<value>mymaster</value>
-				<value>mymaster2</value>
+				<value>shard1</value>
+				<value>shard2</value>
 			</list>
 		</constructor-arg>
 		<constructor-arg index="2">
 			<set>
-				<value>192.168.108.145:26379</value>
+				<value>192.168.109.212:26379</value>
+				<value>192.168.109.215:26379</value>
 			</set>
 		</constructor-arg>
 	</bean>
