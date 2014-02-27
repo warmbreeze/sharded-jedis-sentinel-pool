@@ -153,13 +153,16 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 					    Jedis jedis = new Jedis(hap.getHost(), hap.getPort());
 					    master = masterMap.get(masterName);
 					    if (master == null) {
-							master = toHostAndPort(jedis.sentinelGetMasterAddrByName(masterName));
-							log.fine("Found Redis master at " + master);
-							masterMap.put(masterName, master);
-							shardMasters.add(master);
-							fetched = true;
-							jedis.disconnect();
-							break;
+					    	List<String> hostAndPort = jedis.sentinelGetMasterAddrByName(masterName);
+					    	if (hostAndPort != null && hostAndPort.size() > 0) {
+					    		master = toHostAndPort(hostAndPort);
+								log.fine("Found Redis master at " + master);
+								shardMasters.add(master);
+								masterMap.put(masterName, master);
+								fetched = true;
+								jedis.disconnect();
+								break;
+					    	}
 					    }
 					} catch (JedisConnectionException e) {
 					    log.warning("Cannot connect to sentinel running @ " + hap + ". Trying next one.");
