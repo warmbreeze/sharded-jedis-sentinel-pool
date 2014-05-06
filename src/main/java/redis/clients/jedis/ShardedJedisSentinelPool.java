@@ -23,11 +23,15 @@ import redis.clients.util.Pool;
 
 public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 
+	public static final int MAX_RETRY_SENTINEL = 10;
+	
 	protected final Logger log = Logger.getLogger(getClass().getName());
 	
 	protected GenericObjectPoolConfig poolConfig;
 
     protected int timeout = Protocol.DEFAULT_TIMEOUT;
+    
+    private int sentinelRetry = 0;
 
     protected String password;
 
@@ -36,7 +40,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
     protected Set<MasterListener> masterListeners = new HashSet<MasterListener>();
     
     private volatile List<HostAndPort> currentHostMasters;
-
+    
     public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels) {
 		this(masters, sentinels, new GenericObjectPoolConfig(),
 			Protocol.DEFAULT_TIMEOUT, null, Protocol.DEFAULT_DATABASE);
@@ -143,7 +147,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 	    	HostAndPort master = null;
 	    	boolean fetched = false;
 	    	
-	    	while (!fetched) {
+	    	while (!fetched && sentinelRetry < MAX_RETRY_SENTINEL) {
 	    		for (String sentinel : sentinels) {
 					final HostAndPort hap = toHostAndPort(Arrays.asList(sentinel.split(":")));
 
@@ -178,7 +182,14 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 				    	e.printStackTrace();
 				    }
 		    		fetched = false;
+		    		sentinelRetry++;
 		    	}
+	    	}
+	    	
+	    	// Try MAX_RETRY_SENTINEL times.
+	    	if (!fetched && sentinelRetry >= MAX_RETRY_SENTINEL) {
+	    		log.severe("All sentinels down and try " + MAX_RETRY_SENTINEL + " times, Abort.");
+	    		throw new JedisConnectionException("Cannot connect all sentinels, Abort.");
 	    	}
 	    }
 	    
