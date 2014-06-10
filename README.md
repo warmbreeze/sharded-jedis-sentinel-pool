@@ -1,4 +1,4 @@
-Sharded jedis sentinel
+Sharded jedis sentinel Pool
 ===========================
 ### Redis HA by use Redis Sentinel
 * Requires Jedis2.2.2 or later;<br />
