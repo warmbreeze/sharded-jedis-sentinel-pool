@@ -7,17 +7,6 @@
   <packaging>jar</packaging>
   <name>sharded-jedis-sentinel-pool</name>
   <url>http://maven.apache.org</url>
-  <developers>
-    <developer>
-        <id>warmbreeze</id>
-        <name>Jun Zhang</name>
-        <email>coolbreezezhj@gmail.com</email>
-        <roles>
-            <role>developer</role>
-        </roles>
-        <timezone>+8</timezone>
-    </developer>
-  </developers>
   <properties>
   	<spring.version>3.2.4.RELEASE</spring.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
