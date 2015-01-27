@@ -1,25 +1,18 @@
 package redis.clients.jedis;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
-import java.util.regex.Pattern;
-
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.util.Hashing;
 import redis.clients.util.Pool;
+
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 
@@ -39,7 +32,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 
     protected Set<MasterListener> masterListeners = new HashSet<MasterListener>();
     
-    private volatile List<HostAndPort> currentHostMasters;
+    private volatile List<HostMaster> currentHostMasters;
     
     public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels) {
 		this(masters, sentinels, new GenericObjectPoolConfig(),
@@ -83,7 +76,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		this.password = password;
 		this.database = database;
 
-		List<HostAndPort> masterList = initSentinels(sentinels, masters);
+		List<HostMaster> masterList = initSentinels(sentinels, masters);
 		initPool(masterList);
     }
 
@@ -96,14 +89,16 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
     }
 
     public List<HostAndPort> getCurrentHostMaster() {
-    	return currentHostMasters;
+    	return currentHostMasters.stream().map(m -> m.hostAndPort).collect(Collectors.toList());
     }
 
-    private void initPool(List<HostAndPort> masters) {
-    	if (!equals(currentHostMasters, masters)) {
+    private void initPool(List<HostMaster> masters) {
+    	if (!isPoolInitialized(currentHostMasters, masters)) {
     		StringBuffer sb = new StringBuffer();
-    		for (HostAndPort master : masters) {
-    			sb.append(master.toString());
+    		for (HostMaster master : masters) {
+    			sb.append(master.hostAndPort.toString());
+				sb.append("->");
+				sb.append(master.name);
     			sb.append(" ");
     		}
     		log.info("Created ShardedJedisPool to master at [" + sb.toString() + "]");
@@ -113,7 +108,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
     	}
     }
 
-    private boolean equals(List<HostAndPort> currentShardMasters, List<HostAndPort> shardMasters) {
+    private boolean isPoolInitialized(List<HostMaster> currentShardMasters, List<HostMaster> shardMasters) {
     	if (currentShardMasters != null && shardMasters != null) {
     		if (currentShardMasters.size() == shardMasters.size()) {
     			for (int i = 0; i < currentShardMasters.size(); i++) {
@@ -125,10 +120,11 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		return false;
 	}
 
-	private List<JedisShardInfo> makeShardInfoList(List<HostAndPort> masters) {
+	private List<JedisShardInfo> makeShardInfoList(List<HostMaster> masters) {
 		List<JedisShardInfo> shardMasters = new ArrayList<JedisShardInfo>();
-		for (HostAndPort master : masters) {
-			JedisShardInfo jedisShardInfo = new JedisShardInfo(master.getHost(), master.getPort(), timeout);
+		for (HostMaster master : masters) {
+			JedisShardInfo jedisShardInfo = new JedisShardInfo(master.hostAndPort.getHost(),
+					master.hostAndPort.getPort(), timeout, master.name);
 			jedisShardInfo.setPassword(password);
 			
 			shardMasters.add(jedisShardInfo);
@@ -136,10 +132,10 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		return shardMasters;
 	}
 
-	private List<HostAndPort> initSentinels(Set<String> sentinels, final List<String> masters) {
+	private List<HostMaster> initSentinels(Set<String> sentinels, final List<String> masters) {
 
-    	Map<String, HostAndPort> masterMap = new HashMap<String, HostAndPort>();
-    	List<HostAndPort> shardMasters = new ArrayList<HostAndPort>();
+    	Map<String, HostAndPort> masterMap = new HashMap<>();
+    	List<HostMaster> shardMasters = new ArrayList<>();
     	
 	    log.info("Trying to find all master from available Sentinels...");
 	    
@@ -161,7 +157,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 					    	if (hostAndPort != null && hostAndPort.size() > 0) {
 					    		master = toHostAndPort(hostAndPort);
 								log.fine("Found Redis master at " + master);
-								shardMasters.add(master);
+								shardMasters.add(new HostMaster(master, masterName));
 								masterMap.put(masterName, master);
 								fetched = true;
 								jedis.disconnect();
@@ -343,8 +339,9 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 					    	
 					    	int index = masters.indexOf(switchMasterMsg[0]);
 						    if (index >= 0) {
-						    	HostAndPort newHostMaster = toHostAndPort(Arrays.asList(switchMasterMsg[3], switchMasterMsg[4]));
-						    	List<HostAndPort> newHostMasters = new ArrayList<HostAndPort>();
+						    	HostAndPort newHostAndPort = toHostAndPort(Arrays.asList(switchMasterMsg[3], switchMasterMsg[4]));
+						    	HostMaster newHostMaster = new HostMaster(newHostAndPort, masters.get(index));
+								List<HostMaster> newHostMasters = new ArrayList<>();
 						    	for (int i = 0; i < masters.size(); i++) {
 						    		newHostMasters.add(null);
 						    	}
@@ -405,4 +402,14 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		    }
 		}
     }
+
+	private class HostMaster {
+		private final HostAndPort hostAndPort;
+		private final String name;
+
+		private HostMaster(HostAndPort hostAndPort, String name) {
+			this.hostAndPort = hostAndPort;
+			this.name = name;
+		}
+	}
 }
