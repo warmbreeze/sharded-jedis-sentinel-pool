@@ -23,13 +23,13 @@ group = 'redis.clients'
 
 versions.with {
     guava = '18.0'
-    jedis = '2.6.0'
+    jedis = '2.6.2'
     mockito = '1.8.5'
     junit = '4.11'
     spring = '3.2.4.RELEASE'
     commonspool = '1.6'
     commonspool2 = '2.0'
-    embeddedredis = '0.5.2.b86e331'
+    embeddedredis = '0.5.3.16a1e6d'
     festassert = '1.4'
 }
 
