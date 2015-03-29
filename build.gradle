@@ -26,7 +26,6 @@ versions.with {
     jedis = '2.6.2'
     mockito = '1.8.5'
     junit = '4.11'
-    spring = '3.2.4.RELEASE'
     commonspool = '1.6'
     commonspool2 = '2.0'
     embeddedredis = '0.5.3.16a1e6d'
@@ -44,8 +43,6 @@ dependencies {
         "org.mockito:mockito-all:$versions.mockito",
         "junit:junit:$versions.junit",
         "org.easytesting:fest-assert:$versions.festassert",
-        "org.springframework:spring-core:$versions.spring",
-        "org.springframework:spring-context:$versions.spring",
         "redis.embedded:embedded-redis:$versions.embeddedredis",
     )
 }
