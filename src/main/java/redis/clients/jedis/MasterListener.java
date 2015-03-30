@@ -1,5 +1,6 @@
 package redis.clients.jedis;
 
+import redis.clients.jedis.errors.SilentErrorHandler;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 import java.util.ArrayList;
@@ -17,9 +18,9 @@ class MasterListener extends Thread {
     protected List<String> masters;
     protected String host;
     protected int port;
-    protected long subscribeRetryWaitTimeMillis = 5000;
     protected Jedis jedis;
     protected AtomicBoolean running = new AtomicBoolean(false);
+    private MasterListenerErrorHandler errorHandler;
 
     protected MasterListener(ShardedJedisSentinelPool shardedJedisSentinelPool) {
         this.shardedJedisSentinelPool = shardedJedisSentinelPool;
@@ -30,20 +31,22 @@ class MasterListener extends Thread {
         this.masters = masters;
         this.host = host;
         this.port = port;
+        this.errorHandler = new SilentErrorHandler("Sentinel at " + host + " and port " + port, shardedJedisSentinelPool.log);
     }
 
     public MasterListener(ShardedJedisSentinelPool shardedJedisSentinelPool, List<String> masters, String host, int port,
 						  long subscribeRetryWaitTimeMillis) {
         this(shardedJedisSentinelPool, masters, host, port);
-        this.subscribeRetryWaitTimeMillis = subscribeRetryWaitTimeMillis;
     }
 
     public void run() {
-
         running.set(true);
-
         while (running.get()) {
+            trySubscribeToSentinel();
+        }
+    }
 
+    private void trySubscribeToSentinel() {
         jedis = new Jedis(host, port);
         try {
             jedis.subscribe(new JedisPubSubAdapter() {
@@ -89,23 +92,8 @@ class MasterListener extends Thread {
                     }
                 }
             }, "+switch-master");
-
         } catch (JedisConnectionException e) {
-
-            if (running.get()) {
-                shardedJedisSentinelPool.log.severe("Lost connection to Sentinel at " + host
-                    + ":" + port
-                    + ". Sleeping 5000ms and retrying.");
-                try {
-                    Thread.sleep(subscribeRetryWaitTimeMillis);
-                } catch (InterruptedException e1) {
-                    e1.printStackTrace();
-                }
-            } else {
-                shardedJedisSentinelPool.log.info("Unsubscribing from Sentinel at " + host + ":"
-                        + port);
-            }
-        }
+            errorHandler.handleError(e, running.get());
         }
     }
 
