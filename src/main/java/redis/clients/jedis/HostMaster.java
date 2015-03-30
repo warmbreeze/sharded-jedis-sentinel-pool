@@ -3,7 +3,7 @@ package redis.clients.jedis;
 /**
 * Created by piotrturek on 29/03/15.
 */
-class HostMaster {
+public class HostMaster {
     private final HostAndPort hostAndPort;
     private final String name;
 
