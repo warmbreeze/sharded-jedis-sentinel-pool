@@ -87,6 +87,24 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
     	return currentHostMasters.stream().map(HostMaster::getHostAndPort).collect(Collectors.toList());
     }
 
+	@Override
+	public ShardedJedis getResource() {
+		ShardedJedis jedis = super.getResource();
+		jedis.setDataSource(this);
+		return jedis;
+	}
+
+	@Override
+	public void returnBrokenResource(final ShardedJedis resource) {
+		returnBrokenResourceObject(resource);
+	}
+
+	@Override
+	public void returnResource(final ShardedJedis resource) {
+		resource.resetState();
+		returnResourceObject(resource);
+	}
+
     void initPool(List<HostMaster> masters) {
     	if (!isPoolInitialized(currentHostMasters, masters)) {
     		StringBuffer sb = new StringBuffer();

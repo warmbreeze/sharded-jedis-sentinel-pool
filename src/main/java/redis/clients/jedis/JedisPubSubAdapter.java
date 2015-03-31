@@ -3,7 +3,7 @@ package redis.clients.jedis;
 /**
 * Created by piotrturek on 29/03/15.
 */
-class JedisPubSubAdapter extends JedisPubSub {
+public class JedisPubSubAdapter extends JedisPubSub {
     @Override
     public void onMessage(String channel, String message) {
     }

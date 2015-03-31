@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 public class SilentErrorHandler implements MasterListenerErrorHandler {
     private final Logger log;
     private static final long DEFAULT_SUBSCRIBE_RETRY_WAIT_TIME_MILLIS = 5000;
-    private static final long DEFAULT_SHOUTING_THRESHOLD_MILLIS = 10000;
+    private static final long DEFAULT_SHOUTING_THRESHOLD_MILLIS = 20000;
     private String sentinelDescription;
     private final long subscribeRetryWaitTimeMillis;
     private long shoutingThresholdMillis;
@@ -31,7 +31,7 @@ public class SilentErrorHandler implements MasterListenerErrorHandler {
 
     @Override
     public void handleError(JedisConnectionException exception, boolean running) {
-        final long errorTimeMillis = System.currentTimeMillis();
+        final long errorTimeMillis = System.nanoTime() / 1_000_000;
         final long timeElapsedSinceLastErrorMillis = errorTimeMillis - lastErrorTimeMillis;
         lastErrorTimeMillis = errorTimeMillis;
         if (running) {

@@ -7,16 +7,16 @@ public class HostMaster {
     private final HostAndPort hostAndPort;
     private final String name;
 
+    public HostMaster(HostAndPort hostAndPort, String name) {
+        this.hostAndPort = hostAndPort;
+        this.name = name;
+    }
+
     public HostAndPort getHostAndPort() {
         return hostAndPort;
     }
 
     public String getName() {
         return name;
-    }
-
-    HostMaster(HostAndPort hostAndPort, String name) {
-        this.hostAndPort = hostAndPort;
-        this.name = name;
     }
 }
