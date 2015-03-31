@@ -1,6 +1,5 @@
 package redis.clients.jedis;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.junit.After;
@@ -15,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import static org.fest.assertions.Assertions.assertThat;
 
 public class ShardedJedisSentinelPoolTest {
+	private static final int PORT_OF_SECOND_SHARD = 6383;
 	private RedisCluster cluster;
 	private ShardedJedisSentinelPool pool;
 
@@ -141,7 +141,7 @@ public class ShardedJedisSentinelPoolTest {
 	public void shouldRecoverFromMasterFailover() throws Exception {
 		//given
 		final ShardedJedis preFailover = pool.getResource();
-		final int preFailoverPort = Iterables.getLast(preFailover.getAllShardInfo()).getPort();
+		final int preFailoverPort = preFailover.getAllShardInfo().stream().map(JedisShardInfo::getPort).filter(p -> p != PORT_OF_SECOND_SHARD).findFirst().get();
 
 		//when
 		try {
@@ -151,11 +151,7 @@ public class ShardedJedisSentinelPoolTest {
 
 			//then
 			final ShardedJedis afterFailover = pool.getResource();
-			final int afterFailoverPort = Iterables.getLast(afterFailover.getAllShardInfo()).getPort();
-
-			//assert that we are not looking at the second shard
-			assertThat(preFailoverPort).isNotEqualTo(6383);
-			assertThat(afterFailoverPort).isNotEqualTo(6383);
+			final int afterFailoverPort = afterFailover.getAllShardInfo().stream().map(JedisShardInfo::getPort).filter(p -> p != PORT_OF_SECOND_SHARD).findFirst().get();
 
 			//assert that master port of the first shard changed after manually triggering failover
 			assertThat(preFailoverPort).isNotEqualTo(afterFailoverPort);
