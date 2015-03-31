@@ -1,13 +1,16 @@
 package redis.clients.jedis;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import redis.embedded.RedisCluster;
+import redis.embedded.RedisSentinel;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.fest.assertions.Assertions.assertThat;
 
@@ -17,9 +20,10 @@ public class ShardedJedisSentinelPoolTest {
 
 	@Before
 	public void setUp() throws Exception {
-		cluster = RedisCluster.builder().sentinelCount(3).quorumSize(2)
-				.replicationGroup("shard1", 1)
-				.replicationGroup("shard2", 1)
+		cluster = RedisCluster.builder().withSentinelBuilder(RedisSentinel.builder().downAfterMilliseconds(1000L).failoverTimeout(1000L))
+				.sentinelCount(3).quorumSize(1)
+				.replicationGroup("shard1", 3)
+				.replicationGroup("shard2", 3)
 				.build();
 		cluster.start();
 		final GenericObjectPoolConfig config = new GenericObjectPoolConfig();
@@ -129,6 +133,33 @@ public class ShardedJedisSentinelPoolTest {
 					.isGreaterThanOrEqualTo(maxCount);
 		} finally {
 			if (jedis != null) pool.returnResource(jedis);
+			pool.destroy();
+		}
+	}
+
+	@Test
+	public void shouldRecoverFromMasterFailover() throws Exception {
+		//given
+		final ShardedJedis preFailover = pool.getResource();
+		final int preFailoverPort = Iterables.getLast(preFailover.getAllShardInfo()).getPort();
+
+		//when
+		try {
+			//force manual failover by stopping master of first shard (has to be done this way cause of: https://github.com/antirez/redis/issues/1651)
+			cluster.servers().get(0).stop();
+			TimeUnit.SECONDS.sleep(5);
+
+			//then
+			final ShardedJedis afterFailover = pool.getResource();
+			final int afterFailoverPort = Iterables.getLast(afterFailover.getAllShardInfo()).getPort();
+
+			//assert that we are not looking at the second shard
+			assertThat(preFailoverPort).isNotEqualTo(6383);
+			assertThat(afterFailoverPort).isNotEqualTo(6383);
+
+			//assert that master port of the first shard changed after manually triggering failover
+			assertThat(preFailoverPort).isNotEqualTo(afterFailoverPort);
+		} finally {
 			pool.destroy();
 		}
 	}

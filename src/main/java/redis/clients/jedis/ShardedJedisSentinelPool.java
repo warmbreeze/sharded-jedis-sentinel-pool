@@ -1,17 +1,12 @@
 package redis.clients.jedis;
 
-import org.apache.commons.pool2.PooledObject;
-import org.apache.commons.pool2.PooledObjectFactory;
-import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.util.Hashing;
 import redis.clients.util.Pool;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
@@ -32,7 +27,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 
     protected Set<MasterListener> masterListeners = new HashSet<MasterListener>();
     
-    private volatile List<HostMaster> currentHostMasters;
+    volatile List<HostMaster> currentHostMasters;
     
     public ShardedJedisSentinelPool(List<String> masters, Set<String> sentinels) {
 		this(masters, sentinels, new GenericObjectPoolConfig(),
@@ -89,16 +84,34 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
     }
 
     public List<HostAndPort> getCurrentHostMaster() {
-    	return currentHostMasters.stream().map(m -> m.hostAndPort).collect(Collectors.toList());
+    	return currentHostMasters.stream().map(HostMaster::getHostAndPort).collect(Collectors.toList());
     }
 
-    private void initPool(List<HostMaster> masters) {
+	@Override
+	public ShardedJedis getResource() {
+		ShardedJedis jedis = super.getResource();
+		jedis.setDataSource(this);
+		return jedis;
+	}
+
+	@Override
+	public void returnBrokenResource(final ShardedJedis resource) {
+		returnBrokenResourceObject(resource);
+	}
+
+	@Override
+	public void returnResource(final ShardedJedis resource) {
+		resource.resetState();
+		returnResourceObject(resource);
+	}
+
+    void initPool(List<HostMaster> masters) {
     	if (!isPoolInitialized(currentHostMasters, masters)) {
     		StringBuffer sb = new StringBuffer();
     		for (HostMaster master : masters) {
-    			sb.append(master.hostAndPort.toString());
+    			sb.append(master.getHostAndPort().toString());
 				sb.append("->");
-				sb.append(master.name);
+				sb.append(master.getName());
     			sb.append(" ");
     		}
     		log.info("Created ShardedJedisPool to master at [" + sb.toString() + "]");
@@ -123,8 +136,8 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 	private List<JedisShardInfo> makeShardInfoList(List<HostMaster> masters) {
 		List<JedisShardInfo> shardMasters = new ArrayList<JedisShardInfo>();
 		for (HostMaster master : masters) {
-			JedisShardInfo jedisShardInfo = new JedisShardInfo(master.hostAndPort.getHost(),
-					master.hostAndPort.getPort(), timeout, master.name);
+			JedisShardInfo jedisShardInfo = new JedisShardInfo(master.getHostAndPort().getHost(),
+					master.getHostAndPort().getPort(), timeout, master.getName());
 			jedisShardInfo.setPassword(password);
 			
 			shardMasters.add(jedisShardInfo);
@@ -195,7 +208,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 	    	log.info("Starting Sentinel listeners...");
 			for (String sentinel : sentinels) {
 			    final HostAndPort hap = toHostAndPort(Arrays.asList(sentinel.split(":")));
-			    MasterListener masterListener = new MasterListener(masters, hap.getHost(), hap.getPort());
+			    MasterListener masterListener = new MasterListener(this, masters, hap.getHost(), hap.getPort());
 			    masterListeners.add(masterListener);
 			    masterListener.start();
 			}
@@ -204,212 +217,11 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		return shardMasters;
     }
 
-    private HostAndPort toHostAndPort(List<String> getMasterAddrByNameResult) {
+    HostAndPort toHostAndPort(List<String> getMasterAddrByNameResult) {
     	String host = getMasterAddrByNameResult.get(0);
     	int port = Integer.parseInt(getMasterAddrByNameResult.get(1));
     	
     	return new HostAndPort(host, port);
     }
-    
-    /**
-     * PoolableObjectFactory custom impl.
-     */
-    protected static class ShardedJedisFactory implements PooledObjectFactory<ShardedJedis> {
-		private List<JedisShardInfo> shards;
-		private Hashing algo;
-		private Pattern keyTagPattern;
-	
-		public ShardedJedisFactory(List<JedisShardInfo> shards, Hashing algo, Pattern keyTagPattern) {
-		    this.shards = shards;
-		    this.algo = algo;
-		    this.keyTagPattern = keyTagPattern;
-		}
 
-		public PooledObject<ShardedJedis> makeObject() throws Exception {
-		    ShardedJedis jedis = new ShardedJedis(shards, algo, keyTagPattern);
-		    return new DefaultPooledObject<ShardedJedis>(jedis);
-		}
-	
-		public void destroyObject(PooledObject<ShardedJedis> pooledShardedJedis) throws Exception {
-		    final ShardedJedis shardedJedis = pooledShardedJedis.getObject();
-		    for (Jedis jedis : shardedJedis.getAllShards()) {
-			try {
-			    try {
-				jedis.quit();
-			    } catch (Exception e) {
-			    	
-			    }
-			    jedis.disconnect();
-			} catch (Exception e) {
-	
-			}
-		    }
-		}
-	
-		public boolean validateObject(PooledObject<ShardedJedis> pooledShardedJedis) {
-		    try {
-			ShardedJedis jedis = pooledShardedJedis.getObject();
-			for (Jedis shard : jedis.getAllShards()) {
-			    if (!shard.ping().equals("PONG")) {
-				return false;
-			    }
-			}
-			return true;
-		    } catch (Exception ex) {
-			return false;
-		    }
-		}
-	
-		public void activateObject(PooledObject<ShardedJedis> p) throws Exception {
-	
-		}
-	
-		public void passivateObject(PooledObject<ShardedJedis> p) throws Exception {
-	
-		}
-    }
-
-    protected class JedisPubSubAdapter extends JedisPubSub {
-		@Override
-		public void onMessage(String channel, String message) {
-		}
-	
-		@Override
-		public void onPMessage(String pattern, String channel, String message) {
-		}
-	
-		@Override
-		public void onPSubscribe(String pattern, int subscribedChannels) {
-		}
-	
-		@Override
-		public void onPUnsubscribe(String pattern, int subscribedChannels) {
-		}
-	
-		@Override
-		public void onSubscribe(String channel, int subscribedChannels) {
-		}
-	
-		@Override
-		public void onUnsubscribe(String channel, int subscribedChannels) {
-		}
-    }
-
-    protected class MasterListener extends Thread {
-
-		protected List<String> masters;
-		protected String host;
-		protected int port;
-		protected long subscribeRetryWaitTimeMillis = 5000;
-		protected Jedis jedis;
-		protected AtomicBoolean running = new AtomicBoolean(false);
-	
-		protected MasterListener() {
-		}
-	
-		public MasterListener(List<String> masters, String host, int port) {
-		    this.masters = masters;
-		    this.host = host;
-		    this.port = port;
-		}
-	
-		public MasterListener(List<String> masters, String host, int port,
-			long subscribeRetryWaitTimeMillis) {
-		    this(masters, host, port);
-		    this.subscribeRetryWaitTimeMillis = subscribeRetryWaitTimeMillis;
-		}
-	
-		public void run() {
-	
-		    running.set(true);
-	
-		    while (running.get()) {
-	
-			jedis = new Jedis(host, port);
-	
-			try {
-			    jedis.subscribe(new JedisPubSubAdapter() {
-					@Override
-					public void onMessage(String channel, String message) {
-					    log.fine("Sentinel " + host + ":" + port + " published: " + message + ".");
-		
-					    String[] switchMasterMsg = message.split(" ");
-		
-					    if (switchMasterMsg.length > 3) {
-					    	
-					    	int index = masters.indexOf(switchMasterMsg[0]);
-						    if (index >= 0) {
-						    	HostAndPort newHostAndPort = toHostAndPort(Arrays.asList(switchMasterMsg[3], switchMasterMsg[4]));
-						    	HostMaster newHostMaster = new HostMaster(newHostAndPort, masters.get(index));
-								List<HostMaster> newHostMasters = new ArrayList<>();
-						    	for (int i = 0; i < masters.size(); i++) {
-						    		newHostMasters.add(null);
-						    	}
-						    	Collections.copy(newHostMasters, currentHostMasters);
-						    	newHostMasters.set(index, newHostMaster);
-						    	
-						    	initPool(newHostMasters);
-						    } else {
-						    	StringBuffer sb = new StringBuffer();
-						    	for (String masterName : masters) {
-						    		sb.append(masterName);
-						    		sb.append(",");
-						    	}
-							    log.fine("Ignoring message on +switch-master for master name "
-								    + switchMasterMsg[0]
-								    + ", our monitor master name are ["
-								    + sb + "]");
-							}
-		
-					    } else {
-							log.severe("Invalid message received on Sentinel "
-								+ host
-								+ ":"
-								+ port
-								+ " on channel +switch-master: "
-								+ message);
-					    }
-					}
-			    }, "+switch-master");
-	
-			} catch (JedisConnectionException e) {
-	
-			    if (running.get()) {
-					log.severe("Lost connection to Sentinel at " + host
-						+ ":" + port
-						+ ". Sleeping 5000ms and retrying.");
-					try {
-					    Thread.sleep(subscribeRetryWaitTimeMillis);
-					} catch (InterruptedException e1) {
-					    e1.printStackTrace();
-					}
-			    } else {
-					log.fine("Unsubscribing from Sentinel at " + host + ":"
-						+ port);
-			    }
-			}
-		    }
-		}
-	
-		public void shutdown() {
-		    try {
-				log.fine("Shutting down listener on " + host + ":" + port);
-				running.set(false);
-				// This isn't good, the Jedis object is not thread safe
-				jedis.disconnect();
-		    } catch (Exception e) {
-		    	log.severe("Caught exception while shutting down: " + e.getMessage());
-		    }
-		}
-    }
-
-	private class HostMaster {
-		private final HostAndPort hostAndPort;
-		private final String name;
-
-		private HostMaster(HostAndPort hostAndPort, String name) {
-			this.hostAndPort = hostAndPort;
-			this.name = name;
-		}
-	}
 }
