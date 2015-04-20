@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 * Created by piotrturek on 29/03/15.
 */
 class MasterListener extends Thread {
-
     private ShardedJedisSentinelPool shardedJedisSentinelPool;
     protected List<String> masters;
     protected String host;
@@ -32,6 +31,7 @@ class MasterListener extends Thread {
         this.host = host;
         this.port = port;
         this.errorHandler = new SilentErrorHandler("Sentinel at " + host + " and port " + port, shardedJedisSentinelPool.log);
+        setName("RedisMasterListener-" + host + "-" + port);
     }
 
     public MasterListener(ShardedJedisSentinelPool shardedJedisSentinelPool, List<String> masters, String host, int port,
@@ -39,6 +39,7 @@ class MasterListener extends Thread {
         this(shardedJedisSentinelPool, masters, host, port);
     }
 
+    @Override
     public void run() {
         running.set(true);
         while (running.get()) {
