@@ -1,25 +1,19 @@
-*.class
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
-*.jar
-*.war
-*.ear
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-
-# IDEA stuff
-*.iml
-
-## Directory-based project format:
+# IntelliJ IDEA
 .idea/
-
-## File-based project format:
-*.ipr
+*.iml
 *.iws
+*.ipr
 
-# IntelliJ
-out/
+# Gradle
+build/
+.gradle/
+
+# Misc
+bin/
+log/
+*.log
+
+# Does not ignore anything is source folders
+!**/src/**
+
+generated/
