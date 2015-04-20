@@ -1,10 +1,13 @@
 package redis.clients.jedis;
 
 import com.google.common.collect.Sets;
+
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+
 import redis.embedded.RedisCluster;
 import redis.embedded.RedisSentinel;
 
@@ -137,6 +140,7 @@ public class ShardedJedisSentinelPoolTest {
 		}
 	}
 
+	@Ignore
 	@Test
 	public void shouldRecoverFromMasterFailover() throws Exception {
 		//given
