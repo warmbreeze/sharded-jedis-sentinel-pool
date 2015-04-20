@@ -1,6 +1,8 @@
 package redis.clients.jedis;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.apache.commons.pool2.impl.GenericObjectPoolMXBean;
+
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.util.Hashing;
 import redis.clients.util.Pool;
@@ -75,6 +77,7 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 		initPool(masterList);
     }
 
+    @Override
     public void destroy() {
 		for (MasterListener m : masterListeners) {
 		    m.shutdown();
@@ -216,6 +219,10 @@ public class ShardedJedisSentinelPool extends Pool<ShardedJedis> {
 	    
 		return shardMasters;
     }
+	
+	public GenericObjectPoolMXBean getStatistics() {
+	    return internalPool;
+	}
 
     HostAndPort toHostAndPort(List<String> getMasterAddrByNameResult) {
     	String host = getMasterAddrByNameResult.get(0);
