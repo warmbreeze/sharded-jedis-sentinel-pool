@@ -26,8 +26,7 @@ versions.with {
     jedis = '2.7.0'
     mockito = '1.8.5'
     junit = '4.11'
-    commonspool = '1.6'
-    commonspool2 = '2.0'
+    commonspool2 = '2.3'
     embeddedredis = '0.5.3.16a1e6d'
     festassert = '1.4'
 }
@@ -36,7 +35,6 @@ dependencies {
     compile (
         "com.google.guava:guava:$versions.guava",
         "redis.clients:jedis:$versions.jedis",
-        "commons-pool:commons-pool:$versions.commonspool",
         "org.apache.commons:commons-pool2:$versions.commonspool2",
     )
     testCompile (
