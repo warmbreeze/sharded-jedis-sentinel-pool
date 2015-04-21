@@ -5,7 +5,6 @@ import com.google.common.collect.Sets;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import redis.embedded.RedisCluster;
@@ -45,7 +44,9 @@ public class ShardedJedisSentinelPoolTest {
 		try {
 			jedis = pool.getResource();
 		} finally {
-			if (jedis != null) pool.returnResource(jedis);
+			if (jedis != null) {
+                pool.returnResource(jedis);
+            }
 			pool.destroy();
 		}
 
@@ -68,7 +69,9 @@ public class ShardedJedisSentinelPoolTest {
 			//then
 			assertThat(result).isEqualTo(value);
 		} finally {
-			if (jedis != null) pool.returnResource(jedis);
+			if (jedis != null) {
+                pool.returnResource(jedis);
+            }
 			pool.destroy();
 		}
 	}
@@ -86,7 +89,9 @@ public class ShardedJedisSentinelPoolTest {
 			//then
 			assertThat(allShards).hasSize(2);
 		} finally {
-			if (jedis != null) pool.returnResource(jedis);
+			if (jedis != null) {
+                pool.returnResource(jedis);
+            }
 			pool.destroy();
 		}
 	}
@@ -104,7 +109,9 @@ public class ShardedJedisSentinelPoolTest {
 			assertThat(jedis.getAllShardInfo().stream().map(JedisShardInfo::getName).anyMatch(n -> null == n)).isFalse();
 			assertThat(jedis.getAllShardInfo().stream().map(JedisShardInfo::getName).allMatch(n -> n.equals("shard1") || n.equals("shard2"))).isTrue();
 		} finally {
-			if (jedis != null) pool.returnResource(jedis);
+			if (jedis != null) {
+                pool.returnResource(jedis);
+            }
 			pool.destroy();
 		}
 	}
@@ -135,12 +142,13 @@ public class ShardedJedisSentinelPoolTest {
 			assertThat(minCount * 2).as("The least populated shard should have at most two times less entries than the most populated one")
 					.isGreaterThanOrEqualTo(maxCount);
 		} finally {
-			if (jedis != null) pool.returnResource(jedis);
+			if (jedis != null) {
+                pool.returnResource(jedis);
+            }
 			pool.destroy();
 		}
 	}
 
-	@Ignore
 	@Test
 	public void shouldRecoverFromMasterFailover() throws Exception {
 		//given
@@ -149,20 +157,30 @@ public class ShardedJedisSentinelPoolTest {
 
 		//when
 		try {
-			//force manual failover by stopping master of first shard (has to be done this way cause of: https://github.com/antirez/redis/issues/1651)
+		    // have to wait at least 10 seconds for the slave discovery to complete (before we shutdown master which is used for the discovery)
+		    TimeUnit.SECONDS.sleep(11);
+		    //force manual failover by stopping master of first shard (has to be done this way cause of: https://github.com/antirez/redis/issues/1651)
 			cluster.servers().get(0).stop();
-			TimeUnit.SECONDS.sleep(5);
-
-			//then
-			final ShardedJedis afterFailover = pool.getResource();
-			final int afterFailoverPort = afterFailover.getAllShardInfo().stream().map(JedisShardInfo::getPort).filter(p -> p != PORT_OF_SECOND_SHARD).findFirst().get();
+			
+			
+			// wait until condition is true
+			for(int i = 0; i < 100 && getAfterFailoverPort() == preFailoverPort; i++) {
+			    TimeUnit.MILLISECONDS.sleep(100);
+			}
 
 			//assert that master port of the first shard changed after manually triggering failover
-			assertThat(preFailoverPort).isNotEqualTo(afterFailoverPort);
+			assertThat(getAfterFailoverPort()).isNotEqualTo(preFailoverPort);
 		} finally {
 			pool.destroy();
 		}
 	}
+
+    private int getAfterFailoverPort() {
+        ShardedJedis afterFailover = pool.getResource();
+        int afterFailoverPort = afterFailover.getAllShardInfo().stream().map(JedisShardInfo::getPort).filter(p -> p != PORT_OF_SECOND_SHARD).findFirst().get();
+        pool.returnResource(afterFailover);
+        return afterFailoverPort;
+    }
 
 	@After
 	public void tearDown() throws Exception {
