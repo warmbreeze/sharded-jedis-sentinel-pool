@@ -29,6 +29,7 @@ versions.with {
     commonspool2 = '2.3'
     embeddedredis = '0.5.3.16a1e6d'
     festassert = '1.4'
+    guava_retrying = '2.0.0'
 }
 
 dependencies {
@@ -36,6 +37,7 @@ dependencies {
         "com.google.guava:guava:$versions.guava",
         "redis.clients:jedis:$versions.jedis",
         "org.apache.commons:commons-pool2:$versions.commonspool2",
+        "com.github.rholder:guava-retrying:$versions.guava_retrying"
     )
     testCompile (
         "org.mockito:mockito-all:$versions.mockito",

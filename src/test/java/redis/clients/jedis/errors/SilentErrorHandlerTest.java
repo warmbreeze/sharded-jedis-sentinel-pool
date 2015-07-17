@@ -1,19 +1,21 @@
 package redis.clients.jedis.errors;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.internal.verification.Times;
-import org.mockito.runners.MockitoJUnitRunner;
-import redis.clients.jedis.exceptions.JedisConnectionException;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.verify;
 
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.verify;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import static org.mockito.Mockito.*;
+import org.mockito.runners.MockitoJUnitRunner;
+
+import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RunWith(MockitoJUnitRunner.class)
 public class SilentErrorHandlerTest {
@@ -63,11 +65,14 @@ public class SilentErrorHandlerTest {
     @Test
     public void handleErrorShouldLogFineWhenFailingAfterMoreThanThreshold() throws Exception {
         //when
-        instance.handleError(new JedisConnectionException(""), true);
+        for(int i = 0; i < 3; i++){
+            instance.handleError(new JedisConnectionException(""), true);
+        }
         TimeUnit.SECONDS.sleep(2);
         instance.handleError(new JedisConnectionException(""), true);
 
         //then
-        verify(log, new Times(2)).fine(anyString());
+        verify(log, times(2)).fine(anyString());
+        verify(log, times(2)).severe(anyString());
     }
 }
