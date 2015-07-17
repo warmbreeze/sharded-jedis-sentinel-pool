@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 
 /**
 * Created by piotrturek on 29/03/15.
@@ -43,7 +44,15 @@ class MasterListener extends Thread {
     public void run() {
         running.set(true);
         while (running.get()) {
-            trySubscribeToSentinel();
+            try {
+                trySubscribeToSentinel();
+            } catch (Exception e) {
+                shardedJedisSentinelPool.log.log(Level.SEVERE, "caught unexpected exception to prevent MasterListener thread from dying", e);
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e1) {
+                }
+            }
         }
     }
 
