@@ -1,8 +1,5 @@
 #!/bin/sh
 
-#export LANG="zh_CN.UTF-8";
-#export LC_ALL="zh_CN.UTF-8";
-
 LOG_FILE="/home/work/local/mop/jcpu.log";
 JSTACK_FILE="/home/work/local/mop/jstack.log";
 
@@ -24,9 +21,6 @@ do
         break;
     fi;
     XPID=`printf "%x\n" ${LINE}`;
-    #echo -ne "\033[32m";
     echo ${XPID};
-    #echo -e "\033[34m";
     grep -A 10 "0x${XPID}" ${JSTACK_FILE};
-    #echo -e "\e[0m";
 done;
