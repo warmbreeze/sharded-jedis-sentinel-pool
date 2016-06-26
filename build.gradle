@@ -23,7 +23,7 @@ group = 'redis.clients'
 
 versions.with {
     guava = '18.0'
-    jedis = '2.7.0'
+    jedis = '2.8.0'
     mockito = '1.8.5'
     junit = '4.11'
     commonspool2 = '2.3'
