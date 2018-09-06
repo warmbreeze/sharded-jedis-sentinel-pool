@@ -1,0 +1,47 @@
+apply plugin: 'basdle'
+
+buildscript {
+    repositories {
+        mavenLocal()
+        maven {
+            url baseMavenRepoAllUrl
+            credentials {
+                username baseMavenRepoAllUser
+                password baseMavenRepoAllPassword
+            }
+        }
+        jcenter()
+    }
+
+    dependencies {
+        classpath "com.getbase.basdle:basdle:$basdleVersion"
+    }
+}
+
+group = 'redis.clients'
+
+versions.with {
+    guava = '18.0'
+    jedis = '2.8.0'
+    mockito = '1.8.5'
+    junit = '4.11'
+    commonspool2 = '2.3'
+    embeddedredis = '0.5.3.16a1e6d'
+    festassert = '1.4'
+    guava_retrying = '2.0.0'
+}
+
+dependencies {
+    compile (
+        "com.google.guava:guava:$versions.guava",
+        "redis.clients:jedis:$versions.jedis",
+        "org.apache.commons:commons-pool2:$versions.commonspool2",
+        "com.github.rholder:guava-retrying:$versions.guava_retrying"
+    )
+    testCompile (
+        "org.mockito:mockito-all:$versions.mockito",
+        "junit:junit:$versions.junit",
+        "org.easytesting:fest-assert:$versions.festassert",
+        "redis.embedded:embedded-redis:$versions.embeddedredis",
+    )
+}

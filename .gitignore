@@ -1,3 +1,19 @@
-.classpath
-.project
-target
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Gradle
+build/
+.gradle/
+
+# Misc
+bin/
+log/
+*.log
+
+# Does not ignore anything is source folders
+!**/src/**
+
+generated/
